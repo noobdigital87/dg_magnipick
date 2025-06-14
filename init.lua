@@ -208,7 +208,7 @@ if settings.enable_drop then
 					z = math.random(-1, 1),
 				}
 			end
-			spawned_item:set_velocity(velocity)
+			spawned_item:set_velocity(velocity or {x=0, y=0, z=0})
 		end
 
 		if digger and digger:is_player() then
@@ -278,4 +278,3 @@ core.register_globalstep(function(delta_time)
         	end
 	end
 end)
-
