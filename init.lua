@@ -207,8 +207,8 @@ if settings.enable_drop then
 					y = math.random(0.5, 1),
 					z = math.random(-1, 1),
 				}
+				spawned_item:set_velocity(velocity)
 			end
-			spawned_item:set_velocity(velocity or {x=0, y=0, z=0})
 		end
 
 		if digger and digger:is_player() then
