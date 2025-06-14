@@ -182,7 +182,7 @@ core.register_on_player_receive_fields(function(player, formname, fields)
     	end
 end)
 
-core.register_chatcommand("pickfilt", {
+core.register_chatcommand("magnipick", {
     	description = "Opens the filter form",
     	func = function(name)
         	local player = core.get_player_by_name(name)
