@@ -197,27 +197,27 @@ local original_handle_node_drops = core.handle_node_drops
 
 if settings.enable_drop then
     	core.handle_node_drops = function(position, drops, digger)
-        	for _, drop_item in ipairs(drops) do
-            		local item_stack = ItemStack(drop_item)
-            		local drop_position = vector.add(position, {x = 0, y = 0.5, z = 0})
-            		local spawned_item = core.add_item(drop_position, item_stack)
-            		if spawned_item then
-                		local velocity = {
-                    			x = math.random(-1, 1),
-                    			y = math.random(0.5, 1),
-                    			z = math.random(-1, 1),
-                		}
+		for _, drop_item in ipairs(drops) do
+			local item_stack = ItemStack(drop_item)
+			local drop_position = vector.add(position, {x = 0, y = 0.5, z = 0})
+			local spawned_item = core.add_item(drop_position, item_stack)
+			if spawned_item then
+				local velocity = {
+					x = math.random(-1, 1),
+					y = math.random(0.5, 1),
+					z = math.random(-1, 1),
+				}
 			end
-                	spawned_item:set_velocity(velocity)
-        	end
-	end
-        if digger and digger:is_player() then
-            	return
+			spawned_item:set_velocity(velocity)
+		end
+
+		if digger and digger:is_player() then
+			return
+		end
+		if original_handle_node_drops then
+			original_handle_node_drops(position, drops, digger)
+		end
         end
-        if original_handle_node_drops then
-            	original_handle_node_drops(position, drops, digger)
-        end
-    end
 end
 
 local minimum_pickup_distance = 0.35
