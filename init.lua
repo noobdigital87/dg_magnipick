@@ -185,26 +185,15 @@ core.register_on_joinplayer(function(player)
 	for i, inv_name in ipairs(filter_inv_names) do
 		local inv = core.create_detached_inventory(inv_name, {
 			allow_move = function(inv, from_list, from_index, to_list, to_index, count, player)
-				local stack = inv:get_stack(from_list, from_index)
-				if stack:is_empty() then return 0 end
-				local item_name = stack:get_name()
-
-				-- Uniqueness for both pages
-				for _, other_inv_name in ipairs(filter_inv_names) do
-					local other_inv = core.get_inventory({type="detached", name=other_inv_name})
-					if other_inv then
-						local list = other_inv:get_list("main")
-						for j, s in ipairs(list) do
-							if not s:is_empty() and s:get_name() == item_name and (other_inv_name ~= inv:get_name() or j ~= from_index) then
-								return 0
-							end
-						end
+				-- Only allow sorting if target is empty
+				if from_list == "main" and to_list == "main" then
+					if inv:get_stack(to_list, to_index):is_empty() then
+						return count
+					else
+						return 0
 					end
 				end
-				if not inv:get_stack(to_list, to_index):is_empty() then
-					return 0
-				end
-				return 1
+				return 0
 			end,
 			allow_put = function(inv, listname, index, stack, player)
 				if stack:is_empty() then return 0 end
@@ -228,7 +217,7 @@ core.register_on_joinplayer(function(player)
 				return 1
 			end,
 			allow_take = function(inv, listname, index, stack, player)
-				return 1
+				return 0 -- prevent taking items out of the form
 			end,
 			on_put = function(inv, listname, index, stack, player)
 				update_filter_storage()
@@ -254,7 +243,6 @@ if settings.enable_command then
 		func = function(name)
 			local player = core.get_player_by_name(name)
 			if player then
-				-- Do not reset page, just open current
 				local page = player_page[name] or 1
 				show_formspec(player, page)
 			end
