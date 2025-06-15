@@ -125,7 +125,7 @@ local function build_filter_formspec(name, page)
 		string.format("list[detached:%s;main;0,0.5;8,4;]", filter_inv_names[page]) ..
 		"button[6,4.5;2,1;toggle_mode;Toggle Filter (" .. filter_mode .. ")]" ..
 		string.format("button[0,4.5;2,1;switch_page;Page %d]", page == 1 and 2 or 1) ..
-		"button[3,4.5;2,1;quick_transfer;Quick Transfer]" ..
+		"button[3,4.5;2,1;quick_transfer;Clear List]" ..
 		"list[current_player;main;0,5.5;8,3;]" ..
 		"listring[current_player;main]"
 end
