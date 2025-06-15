@@ -109,9 +109,9 @@ local function quick_transfer(player, page)
 	end
 	local name = player:get_player_name()
 	if transferred then
-		core.chat_send_player(name, "Transferred items to your inventory.")
+		core.chat_send_player(name, "Cleared the filter page.")
 	else
-		core.chat_send_player(name, "No space in inventory, or no allowed items to transfer.")
+		core.chat_send_player(name, "No space in inventory, or nothing to transfer")
 	end
 end
 
@@ -123,7 +123,7 @@ local function build_filter_formspec(name, page)
 		"size[8,9]" ..
 		string.format("label[0,0;Filter List Page %d/2]", page) ..
 		string.format("list[detached:%s;main;0,0.5;8,4;]", filter_inv_names[page]) ..
-		"button[6,4.5;2,1;toggle_mode;Toggle Filter (" .. filter_mode .. ")]" ..
+		"button[6,4.5;2,1;toggle_mode;Filter Mode: " .. filter_mode .. "]" ..
 		string.format("button[0,4.5;2,1;switch_page;Page %d]", page == 1 and 2 or 1) ..
 		"button[3,4.5;2,1;quick_transfer;Clear List]" ..
 		"list[current_player;main;0,5.5;8,3;]" ..
