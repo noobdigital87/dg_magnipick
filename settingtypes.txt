@@ -3,3 +3,5 @@ dg_magnipick.enable_pickup (Enable Pickup) bool true
 dg_magnipick.pickup_radius (Pickup Radius) int 1 0 10
 dg_magnipick.atrraction_speed (Attraction speed) float 10.0 0 20
 dg_magnipick.sound_gain (Sound gain) float 0.5  0 1
+dg_magnipick.enable_command ( Enables chat command "/magnipick" ) bool true
+dg_magnipick.enable_page ( Adds a tab "Magnipick" to the Inventory Menu (I) ) bool true
