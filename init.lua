@@ -98,10 +98,9 @@ local function quick_transfer(player, page)
 	end
 	local transferred = false
 	for _, stack in ipairs(list) do
-		if not stack:is_empty() and is_item_allowed(stack) then
+		if not stack:is_empty() then
 			if player_inv:room_for_item("main", stack) then
 				player_inv:add_item("main", stack)
-				-- Remove one real item from player's inventory
 				player_inv:remove_item("main", ItemStack(stack:get_name()))
 				detached_inv:remove_item("main", stack)
 				transferred = true
@@ -186,14 +185,13 @@ core.register_on_joinplayer(function(player)
 	for i, inv_name in ipairs(filter_inv_names) do
 		local inv = core.create_detached_inventory(inv_name, {
 			allow_move = function(inv, from_list, from_index, to_list, to_index, count, player)
-				-- Only allow moving if the target slot is empty and not a duplicate
 				local stack = inv:get_stack(from_list, from_index)
 				if stack:is_empty() then return 0 end
 				local item_name = stack:get_name()
 				local list = inv:get_list(to_list)
 				for j, s in ipairs(list) do
 					if j ~= to_index and not s:is_empty() and s:get_name() == item_name then
-						return 0 -- Already present elsewhere
+						return 0
 					end
 				end
 				if not inv:get_stack(to_list, to_index):is_empty() then
@@ -207,7 +205,7 @@ core.register_on_joinplayer(function(player)
 				local list = inv:get_list(listname)
 				for i, s in ipairs(list) do
 					if not s:is_empty() and s:get_name() == item_name then
-						return 0 -- Already present
+						return 0
 					end
 				end
 				if not inv:get_stack(listname, index):is_empty() then
