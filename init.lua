@@ -18,6 +18,31 @@ local mod = {
 local filter_inv_names = {mod_name .. "_1", mod_name .. "_2"}
 local player_page = {}
 
+local function is_item_allowed(stack)
+	local filter_mode = mod_storage:get_string("filter_mode")
+	if filter_mode == "" then filter_mode = "off" end
+	local stored_filter_str = mod_storage:get_string("filter_lists")
+	local combined_filter = {}
+	if stored_filter_str ~= "" then
+		local lists = core.deserialize(stored_filter_str) or {}
+		for _, filter in ipairs(lists) do
+			for k, v in pairs(filter) do
+				combined_filter[k] = true
+			end
+		end
+	end
+	local item_name = stack:get_name()
+	if filter_mode == "off" then
+		return true
+	elseif filter_mode == "whitelist" then
+		return combined_filter[item_name] == true
+	elseif filter_mode == "blacklist" then
+		return not combined_filter[item_name]
+	else
+		return true
+	end
+end
+
 local function update_filter_storage()
 	local filters = {}
 	for i, inv_name in ipairs(filter_inv_names) do
@@ -61,7 +86,36 @@ local function restore_filter_lists()
 	end
 end
 
--- Unified formspec builder
+local function quick_transfer(player, page)
+	local player_inv = player:get_inventory()
+	local detached_inv = core.get_inventory({ type = "detached", name = filter_inv_names[page] })
+	if not detached_inv then
+		return
+	end
+	local list = detached_inv:get_list("main")
+	if not list then
+		return
+	end
+	local transferred = false
+	for _, stack in ipairs(list) do
+		if not stack:is_empty() and is_item_allowed(stack) then
+			if player_inv:room_for_item("main", stack) then
+				player_inv:add_item("main", stack)
+				-- Remove one real item from player's inventory
+				player_inv:remove_item("main", ItemStack(stack:get_name()))
+				detached_inv:remove_item("main", stack)
+				transferred = true
+			end
+		end
+	end
+	local name = player:get_player_name()
+	if transferred then
+		core.chat_send_player(name, "Transferred items to your inventory.")
+	else
+		core.chat_send_player(name, "No space in inventory, or no allowed items to transfer.")
+	end
+end
+
 local function build_filter_formspec(name, page)
 	page = page or player_page[name] or 1
 	local filter_mode = mod_storage:get_string("filter_mode")
@@ -88,17 +142,16 @@ if mod.sfinv and settings.enable_page then
 		title = "Magnipick",
 		get = function(self, player, context)
 			local name = player:get_player_name()
-			player_page[name] = 1
 			local page = player_page[name] or 1
 			return sfinv.make_formspec(player, context, build_filter_formspec(name, page), false)
 		end,
 		on_player_receive_fields = function(self, player, context, fields)
+			local name = player:get_player_name()
+			local page = player_page[name] or 1
 			if fields.sfinv_back then
 				sfinv.set_page(player, "sfinv:crafting")
 				return true
 			end
-			local name = player:get_player_name()
-			local page = player_page[name] or 1
 			if fields.switch_page then
 				page = page == 1 and 2 or 1
 				player_page[name] = page
@@ -128,52 +181,54 @@ if mod.sfinv and settings.enable_page then
 	})
 end
 
-local function is_item_allowed(stack)
-	local filter_mode = mod_storage:get_string("filter_mode")
-	if filter_mode == "" then filter_mode = "off" end
-	local stored_filter_str = mod_storage:get_string("filter_lists")
-	local combined_filter = {}
-	if stored_filter_str ~= "" then
-		local lists = core.deserialize(stored_filter_str) or {}
-		for _, filter in ipairs(lists) do
-			for k, v in pairs(filter) do
-				combined_filter[k] = true
-			end
-		end
-	end
-	local item_name = stack:get_name()
-	if filter_mode == "off" then
-		return true
-	elseif filter_mode == "whitelist" then
-		return combined_filter[item_name] == true
-	elseif filter_mode == "blacklist" then
-		return not combined_filter[item_name]
-	else
-		return true
-	end
-end
-
 -- Create both detached inventories with 32 slots each
 core.register_on_joinplayer(function(player)
 	for i, inv_name in ipairs(filter_inv_names) do
 		local inv = core.create_detached_inventory(inv_name, {
 			allow_move = function(inv, from_list, from_index, to_list, to_index, count, player)
-				return count
+				-- Only allow moving if the target slot is empty and not a duplicate
+				local stack = inv:get_stack(from_list, from_index)
+				if stack:is_empty() then return 0 end
+				local item_name = stack:get_name()
+				local list = inv:get_list(to_list)
+				for j, s in ipairs(list) do
+					if j ~= to_index and not s:is_empty() and s:get_name() == item_name then
+						return 0 -- Already present elsewhere
+					end
+				end
+				if not inv:get_stack(to_list, to_index):is_empty() then
+					return 0
+				end
+				return 1
 			end,
 			allow_put = function(inv, listname, index, stack, player)
-			--if stack:get_count() > 1 then
-				--return 1
-			--end
-				return stack:get_count()
+				if stack:is_empty() then return 0 end
+				local item_name = stack:get_name()
+				local list = inv:get_list(listname)
+				for i, s in ipairs(list) do
+					if not s:is_empty() and s:get_name() == item_name then
+						return 0 -- Already present
+					end
+				end
+				if not inv:get_stack(listname, index):is_empty() then
+					return 0
+				end
+				return 1
 			end,
 			allow_take = function(inv, listname, index, stack, player)
-				return stack:get_count()
+				return 1
 			end,
 			on_put = function(inv, listname, index, stack, player)
 				update_filter_storage()
+				if player and player:is_player() then
+					player:get_inventory():add_item("main", ItemStack(stack:get_name()))
+				end
 			end,
 			on_take = function(inv, listname, index, stack, player)
 				update_filter_storage()
+				if player and player:is_player() then
+					player:get_inventory():remove_item("main", ItemStack(stack:get_name()))
+				end
 			end,
 		})
 		inv:set_size("main", 32)
@@ -181,42 +236,15 @@ core.register_on_joinplayer(function(player)
 	restore_filter_lists()
 end)
 
-local function quick_transfer(player, page)
-	local player_inv = player:get_inventory()
-	local detached_inv = core.get_inventory({ type = "detached", name = filter_inv_names[page] })
-	if not detached_inv then
-		return
-	end
-	local list = detached_inv:get_list("main")
-	if not list then
-		return
-	end
-	local transferred = false
-	for _, stack in ipairs(list) do
-		if not stack:is_empty() and is_item_allowed(stack) then
-			if player_inv:room_for_item("main", stack) then
-				player_inv:add_item("main", stack)
-				detached_inv:remove_item("main", stack)
-				transferred = true
-			end
-		end
-	end
-	local name = player:get_player_name()
-	if transferred then
-		core.chat_send_player(name, "Transferred items to your inventory.")
-	else
-		core.chat_send_player(name, "No space in inventory, or no allowed items to transfer.")
-	end
-end
-
 if settings.enable_command then
 	core.register_chatcommand("magnipick", {
 		description = "Opens the filter form",
 		func = function(name)
 			local player = core.get_player_by_name(name)
 			if player then
-				player_page[name] = 1
-				show_formspec(player, 1)
+				-- Do not reset page, just open current
+				local page = player_page[name] or 1
+				show_formspec(player, page)
 			end
 		end,
 	})
@@ -252,10 +280,9 @@ end
 local minimum_pickup_distance = 0.35
 local active_pickup_sounds = {}
 
--- Function to play a sound for item pickup
 local function play_pickup_sound(player_name)
 	if not active_pickup_sounds[player_name] then
-		local sound_duration = 0.3 -- Duration before sound can be replayed
+		local sound_duration = 0.3
 		active_pickup_sounds[player_name] = {time_remaining = sound_duration}
 		core.sound_play({
 			name = mod_name.."_pickup",
@@ -270,9 +297,7 @@ core.register_globalstep(function(delta_time)
 	local players = core.get_connected_players()
 	if players then
 		for _, player in ipairs(players) do
-			local control = player:get_player_control()
-
-			-- Sound suppression (Limits the pickup sounds with every pickup)
+			-- Pickup sound cooldowns
 			for player_name, sound_data in pairs(active_pickup_sounds) do
 				sound_data.time_remaining = sound_data.time_remaining - delta_time
 				if sound_data.time_remaining <= 0 then
@@ -284,7 +309,7 @@ core.register_globalstep(function(delta_time)
 			local player_name = player:get_player_name()
 			local inventory = player:get_inventory()
 
-			for object in core.objects_inside_radius(player_position, settings.pickup_radius) do
+			for object in core.aobjects_inside_radius(player_position, settings.pickup_radius) do
 				if object and not object:is_player() and object:get_luaentity() and object:get_luaentity().name == "__builtin:item" then
 					local item_stack = ItemStack(object:get_luaentity().itemstring)
 					local object_position = object:get_pos()
