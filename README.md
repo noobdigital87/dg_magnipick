@@ -36,3 +36,7 @@
 - **Command & Crafting Menu Toggles:**  
   New settings allow you to enable or disable the `/magnipick` command and the extra crafting menu page (accessible via the **Crafting menu key (default: I)**) so that you can further customize your gameplay experience.
 
+## Licences
+
+- Code: [MIT](https://github.com/noobdigital87/dg_magnipick/blob/main/LICENSE)
+- Media : [CC0](https://creativecommons.org/public-domain/cc0/)
