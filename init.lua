@@ -309,7 +309,7 @@ core.register_globalstep(function(delta_time)
 			local player_name = player:get_player_name()
 			local inventory = player:get_inventory()
 
-			for object in core.aobjects_inside_radius(player_position, settings.pickup_radius) do
+			for object in core.objects_inside_radius(player_position, settings.pickup_radius) do
 				if object and not object:is_player() and object:get_luaentity() and object:get_luaentity().name == "__builtin:item" then
 					local item_stack = ItemStack(object:get_luaentity().itemstring)
 					local object_position = object:get_pos()
