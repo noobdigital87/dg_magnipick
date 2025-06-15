@@ -188,10 +188,17 @@ core.register_on_joinplayer(function(player)
 				local stack = inv:get_stack(from_list, from_index)
 				if stack:is_empty() then return 0 end
 				local item_name = stack:get_name()
-				local list = inv:get_list(to_list)
-				for j, s in ipairs(list) do
-					if j ~= to_index and not s:is_empty() and s:get_name() == item_name then
-						return 0
+
+				-- Uniqueness for both pages
+				for _, other_inv_name in ipairs(filter_inv_names) do
+					local other_inv = core.get_inventory({type="detached", name=other_inv_name})
+					if other_inv then
+						local list = other_inv:get_list("main")
+						for j, s in ipairs(list) do
+							if not s:is_empty() and s:get_name() == item_name and (other_inv_name ~= inv:get_name() or j ~= from_index) then
+								return 0
+							end
+						end
 					end
 				end
 				if not inv:get_stack(to_list, to_index):is_empty() then
@@ -202,10 +209,17 @@ core.register_on_joinplayer(function(player)
 			allow_put = function(inv, listname, index, stack, player)
 				if stack:is_empty() then return 0 end
 				local item_name = stack:get_name()
-				local list = inv:get_list(listname)
-				for i, s in ipairs(list) do
-					if not s:is_empty() and s:get_name() == item_name then
-						return 0
+
+				-- Uniqueness for both pages
+				for _, inv_name2 in ipairs(filter_inv_names) do
+					local other_inv = core.get_inventory({type="detached", name=inv_name2})
+					if other_inv then
+						local list = other_inv:get_list("main")
+						for _, s in ipairs(list) do
+							if not s:is_empty() and s:get_name() == item_name then
+								return 0
+							end
+						end
 					end
 				end
 				if not inv:get_stack(listname, index):is_empty() then
