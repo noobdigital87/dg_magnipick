@@ -1,4 +1,5 @@
 local mod_storage = core.get_mod_storage()
+
 local mod_name = core.get_current_modname()
 
 local settings = {
@@ -7,29 +8,34 @@ local settings = {
 	pickup_radius = tonumber(core.settings:get(mod_name .. ".pickup_radius")) or 1,
 	item_pickup_speed = tonumber(core.settings:get(mod_name .. ".atrraction_speed")) or 10,
 	sound_gain = tonumber(core.settings:get(mod_name .. ".sound_gain")) or 0.5,
+	enable_command = core.settings:get_bool(mod_name .. ".enable_command") or true,
 }
 
+local mod = {
+	sfinv = core.get_modpath("sfinv") and core.global_exists("sfinv")
+}
 
 local filter_inv_names = {mod_name .. "_1", mod_name .. "_2"}
+
 local player_page = {}
 
 local function update_filter_storage()
-    	local filters = {}
-    	for i, inv_name in ipairs(filter_inv_names) do
-        	local inv = core.get_inventory({ type = "detached", name = inv_name })
-        	filters[i] = {}
-        	if inv then
-            		local list = inv:get_list("main")
-            		if list then
-                		for _, stack in ipairs(list) do
-                    			if not stack:is_empty() then
-                        			filters[i][stack:get_name()] = true
-                    			end
-                		end
-            		end
-        	end
-    	end
-    	mod_storage:set_string("filter_lists", core.serialize(filters))
+	local filters = {}
+	for i, inv_name in ipairs(filter_inv_names) do
+		local inv = core.get_inventory({ type = "detached", name = inv_name })
+		filters[i] = {}
+		if inv then
+			local list = inv:get_list("main")
+			if list then
+				for _, stack in ipairs(list) do
+					if not stack:is_empty() then
+						filters[i][stack:get_name()] = true
+					end
+				end
+			end
+		end
+	end
+	mod_storage:set_string("filter_lists", core.serialize(filters))
 end
 
 local function restore_filter_lists()
@@ -54,6 +60,82 @@ local function restore_filter_lists()
             		end
         	end
     	end
+end
+
+local function show_formspec(player, page)
+    	local name = player:get_player_name()
+    	page = page or player_page[name] or 1
+    	player_page[name] = page
+    	local filter_mode = mod_storage:get_string("filter_mode")
+    	if filter_mode == "" then filter_mode = "off" end
+    	local formspec =
+        	"size[8,9]" ..
+        	string.format("label[0,0;Filter List Page %d/2]", page) ..
+        	string.format("list[detached:%s;main;0,0.5;8,4;]", filter_inv_names[page]) ..
+        	"button[6,4.5;2,1;toggle_mode;Toggle Filter (" .. filter_mode .. ")]" ..
+        	string.format("button[0,4.5;2,1;switch_page;Page %d]", page == 1 and 2 or 1) ..
+        	"button[3,4.5;2,1;quick_transfer;Quick Transfer]" ..
+        	"list[current_player;main;0,5.5;8,3;]" ..
+        	"listring[current_player;main]"
+    	core.show_formspec(name, mod_name, formspec)
+end
+
+if mod.sfinv then
+    sfinv.register_page(mod_name .. ":filters", {
+        title = "Magnipick",
+        get = function(self, player, context)
+            local name = player:get_player_name()
+            player_page[name] = 1
+            -- Build the formspec with a Back button in the bottom right
+            local page = player_page[name] or 1
+            local filter_mode = mod_storage:get_string("filter_mode")
+            if filter_mode == "" then filter_mode = "off" end
+            local formspec =
+                "size[8,9]" ..
+                string.format("label[0,0;Filter List Page %d/2]", page) ..
+                string.format("list[detached:%s;main;0,0.5;8,4;]", filter_inv_names[page]) ..
+                "button[6,4.5;2,1;toggle_mode;Toggle Filter (" .. filter_mode .. ")]" ..
+                string.format("button[0,4.5;2,1;switch_page;Page %d]", page == 1 and 2 or 1) ..
+                "button[3,4.5;2,1;quick_transfer;Quick Transfer]" ..
+                "list[current_player;main;0,5.5;8,3;]" ..
+                "listring[current_player;main]"
+            return sfinv.make_formspec(player, context, formspec, false)
+        end,
+        on_player_receive_fields = function(self, player, context, fields)
+            if fields.sfinv_back then
+                sfinv.set_page(player, "sfinv:crafting")
+                return true
+            end
+            -- Forward standard handling to your normal handler
+            local name = player:get_player_name()
+            local page = player_page[name] or 1
+            if fields.switch_page then
+                page = page == 1 and 2 or 1
+                player_page[name] = page
+                sfinv.set_page(player, mod_name .. ":filters")
+                return true
+            elseif fields.toggle_mode then
+                local current_mode = mod_storage:get_string("filter_mode")
+                if current_mode == "" then current_mode = "off" end
+                local new_mode = "off"
+                if current_mode == "off" then
+                    new_mode = "whitelist"
+                elseif current_mode == "whitelist" then
+                    new_mode = "blacklist"
+                elseif current_mode == "blacklist" then
+                    new_mode = "off"
+                end
+                mod_storage:set_string("filter_mode", new_mode)
+                core.chat_send_player(name, "Filter mode set to " .. new_mode)
+                sfinv.set_page(player, mod_name .. ":filters")
+                return true
+            elseif fields.quick_transfer then
+                quick_transfer(player, page)
+                sfinv.set_page(player, mod_name .. ":filters")
+                return true
+            end
+        end,
+    })
 end
 
 local function is_item_allowed(stack)
@@ -107,24 +189,6 @@ core.register_on_joinplayer(function(player)
     	restore_filter_lists()
 end)
 
-local function show_formspec(player, page)
-    	local name = player:get_player_name()
-    	page = page or player_page[name] or 1
-    	player_page[name] = page
-    	local filter_mode = mod_storage:get_string("filter_mode")
-    	if filter_mode == "" then filter_mode = "off" end
-    	local formspec =
-        	"size[8,9]" ..
-        	string.format("label[0,0;Filter List Page %d/2]", page) ..
-        	string.format("list[detached:%s;main;0,0.5;8,4;]", filter_inv_names[page]) ..
-        	"button[6,4.5;2,1;toggle_mode;Toggle Filter (" .. filter_mode .. ")]" ..
-        	string.format("button[0,4.5;2,1;switch_page;Page %d]", page == 1 and 2 or 1) ..
-        	"button[3,4.5;2,1;quick_transfer;Quick Transfer]" ..
-        	"list[current_player;main;0,5.5;8,3;]" ..
-        	"listring[current_player;main]"
-    	core.show_formspec(name, mod_name, formspec)
-end
-
 local function quick_transfer(player, page)
     	local player_inv = player:get_inventory()
     	local detached_inv = core.get_inventory({ type = "detached", name = filter_inv_names[page] })
@@ -152,7 +216,7 @@ local function quick_transfer(player, page)
         	core.chat_send_player(name, "No space in inventory, or no allowed items to transfer.")
    	end
 end
-
+--[[
 core.register_on_player_receive_fields(function(player, formname, fields)
     	if formname == mod_name then
         	local name = player:get_player_name()
@@ -181,17 +245,20 @@ core.register_on_player_receive_fields(function(player, formname, fields)
         	end
     	end
 end)
+]]
 
-core.register_chatcommand("magnipick", {
-    	description = "Opens the filter form",
-    	func = function(name)
-        	local player = core.get_player_by_name(name)
-        	if player then
-            		player_page[name] = 1
-            		show_formspec(player, 1)
-        	end
-    	end,
-})
+if settings.enable_command then
+	core.register_chatcommand("magnipick", {
+		description = "Opens the filter form",
+		func = function(name)
+			local player = core.get_player_by_name(name)
+			if player then
+				player_page[name] = 1
+				show_formspec(player, 1)
+			end
+		end,
+	})
+end
 
 local original_handle_node_drops = core.handle_node_drops
 
@@ -239,8 +306,20 @@ end
 
 core.register_globalstep(function(delta_time)
     	local players = core.get_connected_players()
+
     	if players then
         	for _, player in ipairs(players) do
+
+
+
+					local control = player:get_player_control()
+
+					-- Prevents pickup up when sneak is pressed
+					if control.sneak then
+						break
+					end
+
+					-- Sound supression (Limits the pickup sounds with every pickup)
             		for player_name, sound_data in pairs(active_pickup_sounds) do
                 		sound_data.time_remaining = sound_data.time_remaining - delta_time
                 		if sound_data.time_remaining <= 0 then
