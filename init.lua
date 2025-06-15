@@ -161,6 +161,9 @@ core.register_on_joinplayer(function(player)
 				return count
 			end,
 			allow_put = function(inv, listname, index, stack, player)
+			if stack:get_count() > 1 then
+				return 1
+			end
 				return stack:get_count()
 			end,
 			allow_take = function(inv, listname, index, stack, player)
